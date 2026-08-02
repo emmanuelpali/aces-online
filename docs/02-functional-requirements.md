@@ -1,4 +1,4 @@
-# AcesOnline Functional Requirements
+# PacesOnline Functional Requirements
 
 ## Document Status
 
@@ -19,7 +19,7 @@
 
 ## 1.1 User Roles
 
-AcesOnline will initially support three roles:
+PacesOnline will initially support three roles:
 
 ### Student
 
@@ -295,7 +295,7 @@ Multi-factor authentication is outside the Version 1 scope.
 * Secrets must not be committed to Git.
 * Authentication configuration must be externalized.
 * Production secrets must be supplied using Kubernetes Secrets or an equivalent secret-management mechanism.
-* Error responses must not reveal internal stack traces.
+* Error responses must not reveal internal stack trPaces.
 * Login endpoints must support protection against repeated automated attempts.
 * All production communication must use HTTPS.
 
