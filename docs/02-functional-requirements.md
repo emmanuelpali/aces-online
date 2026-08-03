@@ -2,369 +2,693 @@
 
 ## Document Status
 
-* **Project:** AcesOnline
-* **Version:** 1.0 Draft
-* **Current section:** Identity and Access
-* **Target release:** September 30, 2026
+- **Project:** PacesOnline
+- **Document:** Functional Requirements
+- **Target release:** Version 1
+- **Target date:** September 30, 2026
+- **Status:** Draft for implementation
+- **Current milestone:** Milestone 1 — Identity and Access
 
-## Priority Definitions
+## 1. Purpose
 
-* **MUST:** Required for the September portfolio release.
-* **SHOULD:** Implement after the core workflow is stable.
-* **LATER:** Explicitly excluded from Version 1.
+PacesOnline is a running journal application that allows users to record completed runs, optionally attach a photo, review their run history, and view weekly or monthly running statistics.
 
----
+Version 1 focuses on delivering one complete, secure, tested, documented, and deployable workflow:
 
-# 1. Identity and Access
+```text
+Register or log in
+        ↓
+Record a completed run
+        ↓
+Optionally attach a photo
+        ↓
+View and filter run history
+        ↓
+Review weekly or monthly statistics
+```
 
-## 1.1 User Roles
+Quality, security, and deployability are more important than adding a large number of features.
 
-PacesOnline will initially support three roles:
+## 2. User Roles
 
-### Student
+### 2.1 USER
 
-A student can:
+A user can:
 
-* Browse published courses.
-* Enroll in courses.
-* Access enrolled course content.
-* Complete lessons.
-* Take quizzes.
-* View personal quiz results and progress.
+- Register with an email address and password.
+- Log in and manage an authenticated session.
+- View their own profile.
+- Create, view, update, and delete their own runs.
+- View and filter their run history.
+- Attach one optional photo to a run.
+- View weekly and monthly statistics for their own runs.
 
-### Instructor
+A user must not be able to access or modify another user’s private data.
 
-An instructor can:
-
-* Perform all permitted student actions.
-* Create and update courses.
-* Create lessons and quizzes.
-* Publish eligible courses.
-* View results for students enrolled in their courses.
-
-### Administrator
+### 2.2 ADMIN
 
 An administrator can:
 
-* View and manage user accounts.
-* Assign or remove instructor privileges.
-* Disable and re-enable user accounts.
-* Moderate published courses.
-* Perform administrative operations across the platform.
+- View basic user-account information needed for support or administration.
+- Disable or enable user accounts.
+- Access administrative functionality protected by the `ADMIN` role.
 
----
+Administrative functionality must not expose password hashes, refresh tokens, credentials, or internal secrets.
 
-## IAM-001: User Registration
+## 3. Identity and Access Requirements
 
-**Priority:** MUST
+### 3.1 Registration
 
-A visitor must be able to create a student account using an email address and password.
+The system must allow a new user to register using:
 
-### Acceptance Criteria
+- Email address
+- Password
 
-* Registration requires an email address and password.
-* The email address is normalized before it is stored.
-* Email addresses must be unique, ignoring letter case.
-* Invalid email addresses are rejected.
-* The password must meet the configured password policy.
-* Passwords are never stored in plain text.
-* Passwords are hashed using a secure password encoder.
-* Newly registered users receive the `STUDENT` role.
-* Newly registered accounts are enabled by default.
-* The response must not include the password or password hash.
-* Duplicate email registration returns a clear conflict response.
-* Validation errors use the platform’s standard error format.
-* Passwords and authentication credentials must never appear in application logs.
-* When asynchronous messaging is introduced, successful registration must create a `UserRegistered` event for downstream processing.
+The system must:
 
----
+- Require a valid email address.
+- Require a password that satisfies the configured password policy.
+- Prevent registration with an email address that is already in use.
+- Store passwords only as secure password hashes.
+- Assign the `USER` role by default.
+- Record the account creation time.
+- Return a consistent success or error response.
 
-## IAM-002: User Login
+The system must not return password hashes or sensitive security data in API responses.
 
-**Priority:** MUST
+### 3.2 Login
 
-A registered user must be able to authenticate using their email address and password.
+The system must allow a registered and enabled user to log in using their email address and password.
 
-### Acceptance Criteria
+On successful login, the system must:
 
-* Valid credentials produce an access token and refresh token.
-* Invalid credentials return a generic authentication error.
-* The response must not reveal whether an email address exists.
-* Disabled accounts cannot log in.
-* The access token identifies the user and their assigned roles.
-* Tokens must not contain passwords or unnecessary personal information.
-* Authentication failures are recorded without logging credentials.
-* Access tokens expire after a configurable duration.
-* Refresh tokens expire after a configurable duration.
-* Token durations must be supplied through externalized configuration.
+- Authenticate the user.
+- Return an access token.
+- Return a refresh token.
+- Include token-expiration information where appropriate.
+- Record relevant security audit information.
 
----
+On failed login, the system must:
 
-## IAM-003: Authenticated User Profile
+- Return a consistent authentication error.
+- Avoid revealing whether a specific email address exists.
+- Avoid logging raw passwords or tokens.
 
-**Priority:** MUST
+A disabled user must not be allowed to log in.
 
-An authenticated user must be able to retrieve their own basic account information.
+### 3.3 Access Tokens
 
-### Acceptance Criteria
+Access tokens must:
 
-* The endpoint requires a valid access token.
-* The response includes the user ID, email, roles, account status, and account creation date.
-* The response does not expose password information or refresh tokens.
-* A user can only retrieve their own profile through this endpoint.
-* Expired, malformed, or invalid tokens are rejected consistently.
+- Represent the authenticated user.
+- Include the user identifier.
+- Include the user’s assigned roles or authorities.
+- Have a configurable expiration time.
+- Be validated before protected resources are accessed.
+- Be rejected when expired, malformed, or invalid.
 
----
+### 3.4 Refresh Tokens
 
-## IAM-004: Access-Token Authorization
+The system must allow a valid refresh token to be exchanged for a new authenticated session.
 
-**Priority:** MUST
+Refresh tokens must:
 
-Protected operations must only be available to authenticated users with the required permissions.
+- Have a configurable expiration time.
+- Be revocable.
+- Be rejected when expired, invalid, or revoked.
+- Be stored and handled securely.
+- Not be exposed in logs.
 
-### Acceptance Criteria
+### 3.5 Logout
 
-* Requests without a valid access token are rejected.
-* Expired access tokens are rejected.
-* Users without the required role receive a forbidden response.
-* Authentication failures and authorization failures return different status codes.
-* Role requirements are enforced on the server, not only in the React interface.
-* Internal services must not rely exclusively on hidden frontend controls for authorization.
-* Authorization rules are covered by automated tests.
+The system must allow an authenticated user to log out.
 
----
+Logout must:
 
-## IAM-005: Token Refresh
+- Revoke or invalidate the relevant refresh token or session.
+- Prevent the revoked refresh token from being reused.
+- Return a consistent response whether the token has already been revoked or is no longer valid.
 
-**Priority:** MUST
+### 3.6 Authenticated Profile
 
-An authenticated session must be renewable without requiring the user to enter their credentials whenever an access token expires.
+An authenticated user must be able to view their profile.
 
-### Acceptance Criteria
+The profile response may include:
 
-* A valid refresh token can be exchanged for a new access token.
-* Refresh tokens are stored securely.
-* Refresh tokens are not stored as plain text where avoidable.
-* An expired refresh token cannot be used.
-* A revoked refresh token cannot be used.
-* Refresh-token rotation is supported.
-* Using a rotated token invalidates the previous refresh token.
-* Refresh-token expiration is configurable.
-* Invalid refresh attempts return a generic authentication error.
+- User ID
+- Email address
+- Assigned roles
+- Account status
+- Creation time
 
----
+The profile response must not include:
 
-## IAM-006: Logout
+- Password hash
+- Raw password
+- Refresh token
+- Internal security metadata not intended for the user
 
-**Priority:** MUST
+### 3.7 Account Status
 
-An authenticated user must be able to end their current session.
+A user account must have an enabled or disabled status.
 
-### Acceptance Criteria
+When an account is disabled:
 
-* Logging out revokes the refresh token for the current session.
-* A revoked refresh token cannot produce new access tokens.
-* Already-issued access tokens remain valid only until their configured expiration.
-* Logging out one session does not automatically terminate every user session.
-* A later administrative capability may revoke all sessions for a user.
+- New logins must be rejected.
+- Protected requests must not be authorized.
+- Refresh-token operations must be rejected.
+- Existing credentials must stop providing access according to the selected token-revocation strategy.
 
----
+## 4. Run Management Requirements
 
-## IAM-007: Role Management
+### 4.1 Run Data
 
-**Priority:** MUST
+A run may contain:
 
-An administrator must be able to assign or remove the instructor role.
+```text
+id
+userId
+startedAt
+runType
+distanceKilometres
+durationSeconds
+averagePace
+perceivedEffort
+notes
+photoKey
+createdAt
+updatedAt
+```
 
-### Acceptance Criteria
+Supported run types for Version 1 are:
 
-* Only administrators can change another user’s roles.
-* A student can be promoted to instructor.
-* An instructor can be returned to student-only access.
-* Duplicate roles are not stored.
-* Role changes take effect for newly issued access tokens.
-* Unauthorized role-management attempts are rejected.
-* Role changes are recorded as security audit events.
-* The system prevents accidental removal of required administrative access where that would leave the platform without an administrator.
+```text
+EASY
+RECOVERY
+LONG
+TEMPO
+INTERVAL
+RACE
+```
 
----
+### 4.2 Create a Run
 
-## IAM-008: Account Disabling
+An authenticated user must be able to record a completed run.
 
-**Priority:** MUST
+Required fields:
 
-An administrator must be able to disable or re-enable a user account.
+- Start date and time
+- Run type
+- Distance in kilometres
+- Duration in seconds
 
-### Acceptance Criteria
+Optional fields:
 
-* Only administrators can disable or re-enable accounts.
-* A disabled user cannot log in.
-* A disabled user cannot refresh an authentication session.
-* Existing refresh tokens for a disabled account are revoked or rejected.
-* Protected services reject requests for disabled users when account status validation is required.
-* Re-enabling an account does not restore previously revoked refresh tokens.
-* Account-status changes are recorded as security audit events.
+- Perceived effort
+- Notes
+- One photo
 
----
+The system must:
 
-## IAM-009: Security Audit Events
+- Associate the run with the authenticated user.
+- Calculate average pace from distance and duration.
+- Ignore or reject any client-supplied value that attempts to override the calculated pace.
+- Record creation and update timestamps.
+- Validate all submitted values.
+- Return the created run.
 
-**Priority:** MUST
+### 4.3 View a Run
 
-Important identity and access operations must produce security audit records.
+An authenticated user must be able to view one of their own runs by ID.
 
-### Events to Record
+The system must:
 
-* Successful registration.
-* Successful login.
-* Failed login.
-* Logout.
-* Refresh-token rejection.
-* Role assignment.
-* Role removal.
-* Account disabling.
-* Account re-enabling.
+- Return the run when it belongs to the authenticated user.
+- Reject access when the run belongs to another user.
+- Return a consistent not-found response when the run does not exist or is not accessible.
+- Avoid revealing private information about another user’s run.
 
-### Acceptance Criteria
+### 4.4 Update a Run
 
-* Audit entries include an event type and timestamp.
-* Audit entries include the affected user when known.
-* Administrative events include the administrator who performed the action.
-* Passwords, raw tokens, and other credentials are never included.
-* Audit recording must not expose sensitive information to the client.
-* Failure to write a non-critical audit entry must be visible through logs and metrics.
+An authenticated user must be able to update one of their own runs.
 
----
+The user may update:
 
-## IAM-010: Email Verification
+- Start date and time
+- Run type
+- Distance
+- Duration
+- Perceived effort
+- Notes
+- Optional photo reference
 
-**Priority:** SHOULD
+The system must:
 
-A new user should eventually verify ownership of their email address.
+- Verify ownership before applying the update.
+- Recalculate average pace when distance or duration changes.
+- Validate the updated data.
+- Update the modification timestamp.
+- Reject attempts to update another user’s run.
 
-### Acceptance Criteria
+### 4.5 Delete a Run
 
-* Registration can create an unverified account.
-* A verification token is time-limited.
-* Verification tokens can only be used once.
-* A verified email status is recorded.
-* The verification workflow can use the Notification Service.
-* Version 1 may allow unverified users to explore the platform while restricting selected actions.
+An authenticated user must be able to delete one of their own runs.
 
----
+The system must:
 
-## IAM-011: Password Reset
+- Verify ownership before deletion.
+- Reject attempts to delete another user’s run.
+- Handle associated photo metadata according to the photo-storage design.
+- Return a consistent response when the run does not exist or is not accessible.
 
-**Priority:** SHOULD
+### 4.6 Run History
 
-A user who has forgotten their password should be able to request a password reset.
+An authenticated user must be able to view their run history.
 
-### Acceptance Criteria
+The response must:
 
-* The request response does not reveal whether the email exists.
-* Reset tokens are time-limited and single-use.
-* Completing a reset invalidates the reset token.
-* Existing refresh tokens may be revoked after a successful password change.
-* The new password must satisfy the current password policy.
-* Password-reset notifications are processed through the Notification Service.
+- Include only the authenticated user’s runs.
+- Support pagination.
+- Use a stable and documented sort order.
+- Show the most recent runs first by default.
 
----
+### 4.7 Run Filtering
 
-## IAM-012: Social Authentication
+The user must be able to filter run history by:
 
-**Priority:** LATER
+- Start date
+- End date
+- Run type
 
-Authentication through Google, Microsoft, GitHub, or another external identity provider is outside the Version 1 scope.
+Filters may be combined.
 
----
+The system must:
 
-## IAM-013: Multi-Factor Authentication
+- Validate date ranges.
+- Reject an end date earlier than the start date.
+- Return an empty result when no runs match.
+- Apply filtering only to the authenticated user’s data.
 
-**Priority:** LATER
+## 5. Average Pace Requirements
 
-Multi-factor authentication is outside the Version 1 scope.
+Average pace must be calculated by the backend from distance and duration.
 
----
+The system must:
 
-# 2. Identity Non-Functional Requirements
+- Reject zero or negative distance.
+- Reject zero or negative duration.
+- Use a consistent unit and representation for pace.
+- Document the pace format in the API contract.
+- Recalculate pace after relevant updates.
+- Avoid trusting a pace value supplied by the client.
 
-## Security
+## 6. Perceived Effort Requirements
 
-* Passwords must use a configurable secure hashing algorithm.
-* Credentials and raw tokens must never be logged.
-* Secrets must not be committed to Git.
-* Authentication configuration must be externalized.
-* Production secrets must be supplied using Kubernetes Secrets or an equivalent secret-management mechanism.
-* Error responses must not reveal internal stack traces.
-* Login endpoints must support protection against repeated automated attempts.
-* All production communication must use HTTPS.
+A user may assign a perceived-effort value to a run.
 
-## Configuration
+The allowed range must be documented and validated consistently.
 
-The Identity Service must demonstrate:
+For Version 1, the recommended scale is:
 
-* `application.yml`
-* Environment-specific profiles.
-* `@ConfigurationProperties`
-* Environment-variable overrides.
-* Validation of required configuration.
-* Secure handling of signing keys and database credentials.
-* Different token lifetimes for local, test, and production environments where appropriate.
+```text
+1 to 10
+```
 
-## Reliability
+The field may be omitted.
 
-* Database changes must use versioned migrations.
-* Registration must not create partially initialized users.
-* Duplicate concurrent registration attempts must be handled safely.
-* Token revocation data must survive application restarts.
-* Identity operations must produce useful logs and metrics.
+## 7. Notes Requirements
 
-## Testing
+A user may add notes to a run.
 
-The Identity Service must include:
+The system must:
 
-* Unit tests for business rules.
-* Repository integration tests.
-* Controller or API tests.
-* Spring Security authorization tests.
-* Authentication failure tests.
-* Refresh-token rotation tests.
-* Account-disabling tests.
-* PostgreSQL integration tests using Testcontainers.
-* Tests confirming sensitive fields are not returned.
+- Allow notes to be omitted.
+- Enforce a configured maximum length.
+- Treat notes as plain text.
+- Prevent notes from causing unsafe rendering in the frontend.
 
-## Standard Error Responses
+## 8. Photo Requirements
 
-Identity endpoints must use a consistent error structure containing:
+A user may attach one optional photo to a run.
 
-* Timestamp.
-* HTTP status.
-* Stable error code.
-* Human-readable message.
-* Request or correlation identifier.
-* Field-level validation errors where applicable.
+The system must:
 
-Internal stack traces must not be returned to clients.
+- Store the photo in S3-compatible object storage.
+- Use MinIO for local development.
+- Store only photo metadata and the object key in PostgreSQL.
+- Associate the photo with the correct user and run.
+- Prevent one user from accessing another user’s private photo.
+- Validate supported file types and maximum file size.
+- Reject invalid or unsupported uploads.
+- Handle replacement or deletion consistently.
 
----
+Large binary photo content must not be stored directly in PostgreSQL.
 
-# 3. Identity Definition of Done
+## 9. Statistics Requirements
 
-The Identity and Access milestone is complete when:
+### 9.1 Weekly Statistics
 
-1. A visitor can register as a student.
-2. A registered user can log in.
-3. The user receives working access and refresh tokens.
-4. The user can retrieve their own profile.
-5. Refresh-token rotation works.
-6. Logout revokes the current refresh token.
-7. Student, instructor, and administrator authorization rules work.
-8. An administrator can manage instructor privileges.
-9. An administrator can disable and re-enable accounts.
-10. Important security events are audited.
-11. Database migrations run automatically.
-12. Configuration is externalized and validated.
-13. Automated tests cover the critical workflows.
-14. The service runs locally through Docker.
-15. The API is documented through OpenAPI.
-16. The implementation and architectural decisions are documented.
+An authenticated user must be able to view statistics for a selected week.
+
+Weekly statistics should include:
+
+- Number of runs
+- Total distance
+- Total duration
+- Average pace where meaningful
+
+### 9.2 Monthly Statistics
+
+An authenticated user must be able to view statistics for a selected month.
+
+Monthly statistics should include:
+
+- Number of runs
+- Total distance
+- Total duration
+- Average pace where meaningful
+
+### 9.3 Statistics Rules
+
+The system must:
+
+- Include only the authenticated user’s runs.
+- Define week and month boundaries consistently.
+- Document timezone handling.
+- Return zero-valued statistics when no runs exist.
+- Calculate statistics from PostgreSQL as the source of truth.
+- Treat Redis, if introduced later, only as a cache.
+
+## 10. Authorization and Privacy Requirements
+
+All protected functionality must require authentication.
+
+The system must:
+
+- Identify the authenticated user from validated authentication data.
+- Enforce ownership checks in the service that owns the data.
+- Prevent users from reading or modifying another user’s runs.
+- Prevent users from accessing another user’s photos.
+- Restrict administrative operations to authorized administrators.
+- Avoid relying only on frontend checks for authorization.
+- Avoid accepting a client-supplied `userId` as proof of ownership.
+
+The Run Service must not query the Identity Service database directly.
+
+Each service must own and control access to its own data.
+
+## 11. API Requirements
+
+The frontend must communicate through the Spring Boot BFF.
+
+The BFF must:
+
+- Provide a frontend-oriented API.
+- Call internal services using generated OpenAPI clients.
+- Hide internal service locations.
+- Propagate authentication context safely.
+- Translate internal errors into consistent frontend-facing errors.
+- Remain thin and avoid owning domain business rules.
+
+Internal services must:
+
+- Publish and maintain OpenAPI contracts.
+- Keep API DTOs separate from JPA entities.
+- Validate incoming requests.
+- Return consistent error responses.
+- Avoid exposing internal stack traces.
+- Avoid exposing secrets or sensitive configuration.
+- Treat APIs as contracts.
+
+## 12. Validation Requirements
+
+The system must validate all externally supplied data.
+
+Validation failures must:
+
+- Return a consistent error structure.
+- Identify invalid fields where appropriate.
+- Use clear, user-safe messages.
+- Avoid exposing internal implementation details.
+
+Examples include:
+
+- Invalid email address
+- Weak or missing password
+- Duplicate email address
+- Unsupported run type
+- Zero or negative distance
+- Zero or negative duration
+- Invalid perceived-effort value
+- Notes exceeding the maximum length
+- Invalid date range
+- Unsupported photo type
+- Oversized photo upload
+
+## 13. Error-Handling Requirements
+
+API errors must use a consistent structure.
+
+An error response should contain fields such as:
+
+```text
+timestamp
+status
+code
+message
+path
+correlationId
+fieldErrors
+```
+
+The exact contract must be defined in the relevant OpenAPI specification.
+
+Error responses must:
+
+- Use appropriate HTTP status codes.
+- Avoid exposing stack traces.
+- Avoid exposing SQL, database details, secrets, tokens, or internal hostnames.
+- Include enough information for the client to handle the failure.
+- Include a correlation identifier where available.
+
+## 14. Audit and Logging Requirements
+
+The system must log important operational and security events, including:
+
+- Successful and failed login attempts
+- User registration
+- Account disablement or enablement
+- Token revocation
+- Run creation, update, and deletion
+- Photo upload failures
+- Message-consumption failures
+
+Logs must:
+
+- Avoid raw passwords.
+- Avoid full access or refresh tokens.
+- Avoid unnecessary sensitive personal data.
+- Use structured logging where practical.
+- Include correlation identifiers where practical.
+
+## 15. Messaging Requirements
+
+RabbitMQ will be used for asynchronous work and event delivery.
+
+Potential Version 1 events include:
+
+```text
+UserRegistered
+RunRecorded
+WeeklySummaryRequested
+```
+
+The Notification Worker may:
+
+- Log notification activity.
+- Send a welcome email.
+- Send a weekly running summary.
+- Record failed notification attempts.
+
+Messaging must support:
+
+- Retry handling
+- Dead-letter handling
+- Idempotent consumers
+- Failure logging
+
+RabbitMQ is not required for Issue #1 and must not be introduced before the relevant milestone.
+
+## 16. Service Health Requirements
+
+Each Spring Boot service must provide operational health information using Spring Boot Actuator.
+
+The Identity Service must expose:
+
+```text
+GET /actuator/health
+```
+
+A healthy service must return HTTP `200` with:
+
+```json
+{
+	"status": "UP"
+}
+```
+
+Health endpoints must later support Kubernetes startup, readiness, and liveness probes.
+
+## 17. Testing Requirements
+
+Each completed feature must include appropriate automated tests.
+
+The project should use:
+
+- JUnit 5
+- Mockito
+- `@WebMvcTest`
+- `@DataJpaTest`
+- `@SpringBootTest`
+- Testcontainers
+- Security tests
+- Integration tests
+- Contract-oriented API tests
+
+At minimum:
+
+- Application-context startup must be tested.
+- Validation behavior must be tested.
+- Authorization boundaries must be tested.
+- Users must be prevented from accessing other users’ runs.
+- Persistence behavior must be tested.
+- Core service integrations must be tested.
+
+Testcontainers should be introduced when a real external dependency such as PostgreSQL is added, not during the initial application bootstrap.
+
+## 18. Configuration Requirements
+
+Application configuration must be externalized.
+
+The project will use:
+
+- `application.yml`
+- Environment-specific profiles
+- Environment-variable overrides
+- `@ConfigurationProperties`
+- Configuration validation
+- Fail-fast startup for invalid required configuration
+
+Secrets must not be committed to source control.
+
+Environment-specific values must include:
+
+- Database connection
+- Token durations
+- Signing configuration
+- RabbitMQ connection
+- Object-storage connection
+- Allowed origins
+- File-size limits
+
+Detailed profile and configuration work belongs to Issue #2.
+
+## 19. Deployment Requirements
+
+Version 1 must be deployable using:
+
+- Docker
+- Docker Compose
+- Kubernetes
+
+Kubernetes deployment must eventually include:
+
+- Deployments
+- Services
+- Ingress
+- ConfigMaps
+- Secrets
+- Startup probes
+- Readiness probes
+- Liveness probes
+- Resource requests
+- Resource limits
+- Rolling updates
+- Rollback support
+
+The core workflow must work through Docker Compose before the Kubernetes release is considered complete.
+
+## 20. Version 1 Completion Criteria
+
+Version 1 is not complete until:
+
+1. Registration and login work.
+2. Access and refresh tokens work.
+3. Disabled users are prevented from accessing protected resources.
+4. Run CRUD works.
+5. Authorization prevents cross-user access.
+6. Run history and filtering work.
+7. Average pace is calculated by the backend.
+8. Optional photo upload works.
+9. Weekly and monthly statistics work.
+10. Core automated tests pass.
+11. Docker Compose runs the system.
+12. The application is deployable to Kubernetes.
+13. APIs and local-development workflows are documented.
+14. The complete user workflow can be demonstrated.
+
+## 21. Explicitly Out of Scope for Version 1
+
+Version 1 does not include:
+
+- Elasticsearch
+- Kafka
+- GPS tracking
+- Route maps
+- Wearable-device integrations
+- Social feeds
+- Followers
+- Likes
+- Comments
+- Running clubs
+- Challenges
+- Training plans
+- Payments
+- Mobile applications
+- AI coaching
+- Advanced analytics
+- Service mesh
+- Event sourcing
+
+These features must not delay the secure, tested, documented, and deployable Version 1 workflow.
+
+## 22. Current Issue Boundary
+
+The current issue is:
+
+```text
+Issue #1 — Bootstrap Identity Service
+```
+
+Issue #1 includes only:
+
+- Generate the Spring Boot application.
+- Establish the initial package structure.
+- Add Spring Boot Actuator.
+- Expose a health endpoint.
+- Add an application-context startup test.
+- Document how to run the service locally.
+- Confirm the application builds and starts.
+
+Issue #1 does not include:
+
+- User entities
+- Registration
+- Authentication
+- JWT
+- Refresh tokens
+- Flyway migrations
+- RabbitMQ
+- Redis
+- Photo storage
+- Business logic
