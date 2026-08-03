@@ -1,0 +1,6 @@
+logs/
+target/
+*.log
+*.iml
+.scope
+.vscode/
