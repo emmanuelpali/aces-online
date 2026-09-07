@@ -38,12 +38,4 @@ public class LoginController {
                 result.refreshTokenExpiresIn()
         );
     }
-
-    @PostMapping("/logout")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout(
-            @Valid @RequestBody LogoutRequest request
-    ) {
-        loginService.logout(request.refreshToken());
-    }
 }

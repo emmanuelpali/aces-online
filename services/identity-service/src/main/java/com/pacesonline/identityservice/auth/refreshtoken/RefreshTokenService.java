@@ -112,17 +112,4 @@ public class RefreshTokenService {
                 expiresAt
         );
     }
-
-    public void revokeFamily(String refreshToken) {
-        String tokenHash = refreshTokenGenerator.hash(refreshToken);
-
-        RefreshToken currentToken = refreshTokenRepository
-                .findByTokenHashForUpdate(tokenHash)
-                .orElseThrow(InvalidRefreshTokenException::new);
-
-        refreshTokenRepository.revokeFamilyTokens(
-                currentToken.getFamilyId(),
-                Instant.now()
-        );
-    }
 }

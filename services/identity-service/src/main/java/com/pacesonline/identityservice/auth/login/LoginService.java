@@ -74,10 +74,4 @@ public class LoginService {
                 tokenProperties.refreshTokenExpiration().toSeconds()
         );
     }
-
-    
-    @Transactional
-    public void logout(String refreshToken) {
-        refreshTokenService.revokeFamily(refreshToken);
-    }
 }
