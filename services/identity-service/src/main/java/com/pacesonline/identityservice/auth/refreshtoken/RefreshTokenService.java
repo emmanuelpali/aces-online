@@ -112,4 +112,15 @@ public class RefreshTokenService {
                 expiresAt
         );
     }
+
+    @Transactional
+    public void revokeFamilyTokens(String rawToken) {
+        String tokenHash = refreshTokenGenerator.hash(rawToken);
+        refreshTokenRepository
+                .findByTokenHashForUpdate(tokenHash)
+                .ifPresent(refreshToken -> { 
+                        refreshTokenRepository.revokeFamilyTokens(refreshToken.getFamilyId(),
+                                Instant.now());
+                });
+    }
 }
