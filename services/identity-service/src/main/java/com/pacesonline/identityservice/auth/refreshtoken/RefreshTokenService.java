@@ -114,7 +114,7 @@ public class RefreshTokenService {
     }
 
     @Transactional
-    public void revokeFamilyTokens(String rawToken) {
+    public void revokeFamilyForToken(String rawToken) {
         String tokenHash = refreshTokenGenerator.hash(rawToken);
         refreshTokenRepository
                 .findByTokenHashForUpdate(tokenHash)

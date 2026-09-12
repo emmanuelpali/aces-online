@@ -47,6 +47,9 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import org.springframework.http.MediaType;
+
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -711,5 +714,79 @@ class IdentityServiceApplicationTests {
         );
 
         assertThat(refreshTokenCount).isZero();
+        }
+
+        @Test
+        void logoutRevokesRefreshTokenFamilyAndIsIdempotent()
+                throws Exception {
+
+        String email = "logout-integration@example.com";
+        String password = "strong-password";
+
+        registrationService.register(email, password);
+
+        LoginResult loginResult = loginService.login(
+                email,
+                password
+        );
+
+        String originalTokenHash = refreshTokenGenerator.hash(
+                loginResult.refreshToken()
+        );
+
+        UUID familyId = jdbcTemplate.queryForObject(
+                """
+                SELECT family_id
+                FROM refresh_tokens
+                WHERE token_hash = ?
+                """,
+                UUID.class,
+                originalTokenHash
+        );
+
+        RefreshTokenRotationResult rotationResult =
+                refreshTokenService.rotate(
+                        loginResult.refreshToken()
+                );
+
+        String logoutRequest = """
+                {
+                "refreshToken": "%s"
+                }
+                """.formatted(loginResult.refreshToken());
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(logoutRequest))
+                .andExpect(status().isNoContent());
+
+        Long unrevokedFamilyTokenCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM refresh_tokens
+                WHERE family_id = ?
+                AND revoked_at IS NULL
+                """,
+                Long.class,
+                familyId
+        );
+
+        assertThat(unrevokedFamilyTokenCount).isZero();
+
+        String refreshRequest = """
+                {
+                "refreshToken": "%s"
+                }
+                """.formatted(rotationResult.refreshToken());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshRequest))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(logoutRequest))
+                .andExpect(status().isNoContent());
         }
 }

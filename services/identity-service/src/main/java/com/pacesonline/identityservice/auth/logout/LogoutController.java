@@ -25,6 +25,6 @@ public class LogoutController {
     @PostMapping ("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT) 
     public void logout(@Valid @RequestBody RefreshTokenRequest request) {
-        refreshTokenService.revokeFamilyTokens(request.refreshToken());
+        refreshTokenService.revokeFamilyForToken(request.refreshToken());
     }
 }
