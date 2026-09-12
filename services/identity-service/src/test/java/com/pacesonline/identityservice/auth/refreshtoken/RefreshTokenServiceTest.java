@@ -270,4 +270,33 @@ class RefreshTokenServiceTest {
                 "encoded-password"
         );
     }
+
+    @Test 
+    void revokeFamilyForTokenRevokesTokensForFamily() {
+        RefreshToken token = createActiveToken();
+
+        arrangeExistingToken(token);
+
+        refreshTokenService.revokeFamilyForToken(RAW_TOKEN);
+        verify(refreshTokenGenerator).hash(RAW_TOKEN);
+        verify(refreshTokenRepository).findByTokenHashForUpdate(TOKEN_HASH);
+        verify(refreshTokenRepository).revokeFamilyTokens(
+                eq(token.getFamilyId()),
+                any(Instant.class)
+        );
+ }
+
+    @Test 
+    void revokeFamilyTokensDoesNothingWhenTokenIsUnknown() {
+        when(refreshTokenGenerator.hash(RAW_TOKEN))
+                .thenReturn(TOKEN_HASH);
+
+        when(refreshTokenRepository.findByTokenHashForUpdate(TOKEN_HASH))
+                .thenReturn(Optional.empty());
+
+        refreshTokenService.revokeFamilyForToken(RAW_TOKEN);
+        verify(refreshTokenGenerator).hash(RAW_TOKEN);
+        verify(refreshTokenRepository).findByTokenHashForUpdate(TOKEN_HASH);
+        verify(refreshTokenRepository, never()).revokeFamilyTokens(any(), any());
+    }
 }

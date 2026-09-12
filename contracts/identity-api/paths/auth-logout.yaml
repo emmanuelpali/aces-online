@@ -1,0 +1,22 @@
+post:
+  tags:
+    - Authentication
+  summary: Log out of the current session
+  description: >
+    Revokes the refresh token family identified by the supplied refresh token. 
+    The operation is idempotent.
+  operationId: logout
+
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/authentication.yaml#/RefreshTokenRequest'
+
+  responses:
+    "204":
+      description: Successfully logged out
+
+    "400":
+      description: logout request is invalid
